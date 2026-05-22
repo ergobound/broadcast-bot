@@ -1,0 +1,7 @@
+python-telegram-bot
+python-telegram-bot[callback-data]
+python-telegram-bot[job-queue]
+telethon
+mysql-connector-python
+python-dotenv
+loguru

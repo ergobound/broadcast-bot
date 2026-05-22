@@ -1,0 +1,11 @@
+/__pycache__/
+.env
+.vscode
+.venv
+info
+
+jobs.pkl
+broadcast.db
+bot.py
+test.py
+sessions
