@@ -220,7 +220,10 @@ async def broadtask(context: ContextTypes.DEFAULT_TYPE) -> None:
     clients.setdefault(userid, await TClient.create(session, api_id, api_hash,
                                        username=job.data["username_creator"],
                                        userid=job.data["userid_creator"]))
-    # clients[userid] = await TClient.create(session, api_id, api_hash) # На всякий пересоздаем (надо ли?)
+    if not clients.get(userid):
+        clients[userid] = await TClient.create(session, api_id, api_hash, username, userid,
+                                                    username=job.data["username_creator"], serid=job.data["userid_creator"])
+
     try:
         await asyncio.sleep(random.randint(1, 60))
         await clients[userid].send_message(job.data["contact"], job.data["text"])

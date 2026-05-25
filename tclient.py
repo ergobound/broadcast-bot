@@ -147,11 +147,11 @@ class TClient:
                 logging.info(f"{type(err).__name__}: {err.args[1]} | {err.args[0]} | {await self.info()}")
                 raise err 
             except errors.AuthKeyUnregisteredError as err:
-                err.args = ("Сессия аннулирована/Аккаунт удален/Проблема файла сессии. Попробуйте заново авторизоваться.", str(err))
+                err.args = ("Необходима авторизация аккаунта телеграм.", str(err))
                 logging.error(f"{type(err).__name__}: {err.args[1]} | {err.args[0]} | {await self.info()}", exc_info=True)
                 raise err
             except (errors.SessionExpiredError, errors.SessionRevokedError) as err:
-                err.args = ("Необходима авторизация аккаунта", str(err))
+                err.args = ("Необходима авторизация аккаунта телеграм.", str(err))
                 logging.error(f"{type(err).__name__}: {err.args[1]} | {err.args[0]} | {await self.info()}", exc_info=True)
                 raise err
             except (errors.PhoneNumberInvalidError, errors.PhoneNumberUnoccupiedError) as err:
