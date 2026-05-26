@@ -40,7 +40,7 @@ from job_serialization import save_jobs_to_file, restore_jobs_from_file
 
 logging.basicConfig(stream=sys.stderr, level=logging.INFO)
 logging.getLogger("httpx").setLevel(logging.WARNING)
-logging.getLogger("telethon").setLevel(logging.ERROR)
+logging.getLogger("telethon").setLevel(logging.INFO)
 
 from warnings import filterwarnings
 from telegram.warnings import PTBUserWarning
@@ -223,7 +223,7 @@ async def broadcast_finish(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     text = "Рассылка добавлена в очередь!\n" + (BROADCAST_INFO % data)
     reply_markup = InlineKeyboardMarkup(menu_btn)
     await update.effective_user.send_message(text, reply_markup=reply_markup)
-    return ConversationHandler.END
+    # return ConversationHandler.END
 
 async def broadtask(context: ContextTypes.DEFAULT_TYPE) -> None:
     job = context.job
@@ -241,7 +241,7 @@ async def broadtask(context: ContextTypes.DEFAULT_TYPE) -> None:
         text = "Сообщение доставлено:\n" + (BROADCAST_INFO % job.data)
         logging.info(f"broadtask | Сообщение доставлено {job.data}")
     except BaseException as err:
-        text = err.args[0]
+        text = f"Сообщение не доставлено для {job.data["contact"]}:\n{err.args[0]}"
     
     # Логирование в избранное аккаунта, который отвечает за рассылку
     # try: await clients[userid].send_message("me", text)
@@ -338,13 +338,18 @@ async def add_admin_complete(update: Update, context: ContextTypes.DEFAULT_TYPE)
         text = "Введите только цифры"
     reply_markup = InlineKeyboardMarkup(menu_btn)
     await update.effective_user.send_message(text, reply_markup=reply_markup)
-    return ConversationHandler.END
+    # return ConversationHandler.END
 # LOGIN
 async def tglogin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    userid = update.effective_user.id
+    username = update.effective_user.username
+    session = f"{session_dir}/{userid}"
     query = update.callback_query
     await query.answer()
     text = "Введите номер телефона: "
-    # await update.effective_user.send_message(text=text)
+    if clients.get(userid):
+        del clients[userid]
+    clients[userid] = await TClient.create(session, api_id, api_hash, username=username, userid=userid)
     reply_markup = InlineKeyboardMarkup(cancel_btn)
     await query.edit_message_text(text=text, reply_markup=reply_markup)
     return ENTER_PHONE
@@ -360,6 +365,7 @@ async def enter_code(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     try:
         phone_code_hash = await clients[userid].send_code(phone)
     except BaseException as err:
+        # reply_markup = InlineKeyboardMarkup(menu_btn)
         await update.effective_user.send_message(err.args[0], reply_markup=reply_markup) 
         return ConversationHandler.END
 

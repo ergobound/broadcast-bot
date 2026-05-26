@@ -7,7 +7,7 @@ import os, sys, logging
 import random
 load_dotenv()
 logging.basicConfig(stream=sys.stderr, level=logging.INFO)
-logging.getLogger("telethon").setLevel(logging.INFO)
+# logging.getLogger("telethon").setLevel(logging.DEBUG)
 # logging.getLogger("httpx").setLevel(logging.WARNING)
 
 api_id = os.getenv("API_ID")
@@ -40,7 +40,7 @@ class TClient:
         return self
 
     async def build(self):
-        self.client = TelegramClient(self.session, self.api_id, self.api_hash, *self.kwargs)
+        self.client = TelegramClient(self.session, self.api_id, self.api_hash)
         await self.save_phone()
 
     async def is_authorized(self) -> bool:
@@ -57,6 +57,7 @@ class TClient:
             await self.connect()
 
         sendcode = await self.client.send_code_request(phone)
+        logging.info(f"Отправлен код: {phone} | {sendcode.to_json()} | {await self.info()}")
         return sendcode.phone_code_hash
         
     async def sign(self, phone=None, code=None, phone_code_hash=None, password=None) -> bool | None:
