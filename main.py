@@ -59,8 +59,8 @@ CHOOSE_BROADCAST,
 ADD_ADMIN, ADD_ADMIN_COMPLETE,
 ENTER_CONTACT, ENTER_TEXT, ENTER_TIME, ENTER_DAYS,
 ENTER_PHONE, ENTER_PASSWORD, ENTER_CODE, TGLOGIN_FINISH,
-CONTINUE, CANCEL, RIGHT, LEFT,
-) = range(19)
+CONTINUE, CANCEL, RIGHT, LEFT, MENU
+) = range(20)
 
 BROADCAST_INFO = "Контакт: %(contact)s\nТекст: \n%(text)s\n\nНачало: %(first)s, Конец: %(last)s"
 DFORMAT = "%d.%m.%Y | %H:%M" # "%d.%m.%Y | %H:%M:%S"
@@ -80,6 +80,9 @@ clients: dict[int, TClient] = {}
 # client = TelegramClient(session, api_id, api_hash) # loop=asyncio.get_running_loop()
 
 os.makedirs(session_dir, exist_ok=True)
+
+cancel_btn = [[InlineKeyboardButton("Отмена", callback_data=str(CANCEL))]]
+menu_btn = [[InlineKeyboardButton("Главное меню", callback_data=(str(MENU)))]]
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     tb_list = traceback.format_exception(None, context.error, context.error.__traceback__)
@@ -152,7 +155,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     reply_markup = InlineKeyboardMarkup(keyboard)
     autorized_text = "Аккаунт авторизован." if autorized else "Аккаунт неавторизован."
     text = ("Добро пожаловать !\n" + autorized_text)
-    await update.message.reply_text(text=text, reply_markup=reply_markup)
+    if not update.callback_query:
+        await update.message.reply_text(text=text, reply_markup=reply_markup)
+    else:
+        await update.callback_query.answer()
+        await update.callback_query.edit_message_text(text=text, reply_markup=reply_markup)
     return ConversationHandler.END
 # BROADCAST
 async def enter_contact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -162,7 +169,8 @@ async def enter_contact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     await query.answer()
     text = "Введите username или номер телефона:"
     # await update.effective_user.send_message(text)
-    await query.edit_message_text(text=text, reply_markup=None)
+    reply_markup = InlineKeyboardMarkup(cancel_btn)
+    await query.edit_message_text(text=text, reply_markup=reply_markup)
     return ENTER_CONTACT
 
 async def enter_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -170,7 +178,8 @@ async def enter_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     userid = update.effective_user.id
     user_data["broadcast_contact"] = update.message.text
     text = "Текст рассылки: "
-    await update.effective_user.send_message(text)
+    reply_markup = InlineKeyboardMarkup(cancel_btn)
+    await update.effective_user.send_message(text, reply_markup=reply_markup)
     return ENTER_TEXT
 
 async def enter_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -178,7 +187,8 @@ async def enter_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     userid = update.effective_user.id
     user_data["broadcast_text"] = update.message.text
     text = "Время рассылки в формате чч:мм (00:00):"
-    await update.effective_user.send_message(text)
+    reply_markup = InlineKeyboardMarkup(cancel_btn)
+    await update.effective_user.send_message(text, reply_markup=reply_markup)
     return ENTER_TIME
 
 async def enter_days(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -186,7 +196,8 @@ async def enter_days(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     userid = update.effective_user.id
     user_data["broadcast_time"] = update.message.text
     text = "Сколько дней повторять:"
-    await update.effective_user.send_message(text)
+    reply_markup = InlineKeyboardMarkup(cancel_btn)
+    await update.effective_user.send_message(text, reply_markup=reply_markup)
     return ENTER_DAYS
 
 async def broadcast_finish(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -210,19 +221,19 @@ async def broadcast_finish(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                                           data=data, name=None, user_id=userid)
     
     text = "Рассылка добавлена в очередь!\n" + (BROADCAST_INFO % data)
-    await update.effective_user.send_message(text)
+    reply_markup = InlineKeyboardMarkup(menu_btn)
+    await update.effective_user.send_message(text, reply_markup=reply_markup)
     return ConversationHandler.END
 
 async def broadtask(context: ContextTypes.DEFAULT_TYPE) -> None:
     job = context.job
     userid = job.user_id
     session = f"{session_dir}/{userid}"
-    clients.setdefault(userid, await TClient.create(session, api_id, api_hash,
-                                       username=job.data["username_creator"],
-                                       userid=job.data["userid_creator"]))
+    # clients.setdefault(userid, await TClient.create(session, api_id, api_hash,
+    #                                    username=job.data["username_creator"],
+    #                                    userid=job.data["userid_creator"]))
     if not clients.get(userid):
-        clients[userid] = await TClient.create(session, api_id, api_hash, username, userid,
-                                                    username=job.data["username_creator"], serid=job.data["userid_creator"])
+        clients[userid] = await TClient.create(session, api_id, api_hash, username=job.data["username_creator"], serid=job.data["userid_creator"])
 
     try:
         await asyncio.sleep(random.randint(1, 60))
@@ -233,9 +244,9 @@ async def broadtask(context: ContextTypes.DEFAULT_TYPE) -> None:
         text = err.args[0]
     
     # Логирование в избранное аккаунта, который отвечает за рассылку
-    try: await clients[userid].send_message("me", text)
-    except: pass
-    # А так же в бот, пользователю, который создал рассылку
+    # try: await clients[userid].send_message("me", text)
+    # except: pass
+    # Уведомление пользователю, который создал рассылку
     try:  await context.bot.send_message(chat_id=userid, text=text)
     except: pass
 # ACTIVE BROADCAST
@@ -265,7 +276,7 @@ async def active_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         btn_txt = f"{job.data['contact']} | {time}"
         keyboard.append([InlineKeyboardButton(text=btn_txt, callback_data=f"job-{id}")])
     if arrows[0]: keyboard += arrows
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    reply_markup = InlineKeyboardMarkup(keyboard + menu_btn)
     await query.answer()
     await query.edit_message_text(text=text, reply_markup=reply_markup)
     user_data["broadcast_page"] = page
@@ -298,8 +309,9 @@ async def delete_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     else:
         job.schedule_removal()
         text = "Рассылка удалена"
+    reply_markup = InlineKeyboardMarkup(menu_btn)
     await query.answer()
-    await query.edit_message_text(text, reply_markup=None)
+    await query.edit_message_text(text, reply_markup=reply_markup)
 #ADMIN
 async def add_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
@@ -307,7 +319,8 @@ async def add_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = "Введите user_id (получить можно здесь @ScanIDBot):"
     await query.answer()
     # await update.effective_user.send_message(text)
-    await query.edit_message_text(text=text, reply_markup=None)
+    reply_markup = InlineKeyboardMarkup(cancel_btn)
+    await query.edit_message_text(text=text, reply_markup=reply_markup)
     return ADD_ADMIN
 
 async def add_admin_complete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -323,7 +336,8 @@ async def add_admin_complete(update: Update, context: ContextTypes.DEFAULT_TYPE)
         logging.info(f"Админ {message} добавлен в базу данных {BOT_DB}")
     else:
         text = "Введите только цифры"
-    await update.effective_user.send_message(text)
+    reply_markup = InlineKeyboardMarkup(menu_btn)
+    await update.effective_user.send_message(text, reply_markup=reply_markup)
     return ConversationHandler.END
 # LOGIN
 async def tglogin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -331,25 +345,27 @@ async def tglogin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await query.answer()
     text = "Введите номер телефона: "
     # await update.effective_user.send_message(text=text)
-    await query.edit_message_text(text=text, reply_markup=None)
+    reply_markup = InlineKeyboardMarkup(cancel_btn)
+    await query.edit_message_text(text=text, reply_markup=reply_markup)
     return ENTER_PHONE
 
 async def enter_code(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     userid = update.effective_user.id
     user_data = context.user_data
     phone = user_data["phone"] = update.message.text.replace(" ", "")
+    reply_markup = InlineKeyboardMarkup(cancel_btn)
     if not phone.replace("+", "").isnumeric():
-        await update.effective_user.send_message("Введите корректный номер телефона")
+        await update.effective_user.send_message("Введите корректный номер телефона", reply_markup=reply_markup)
         return ENTER_PHONE
     try:
         phone_code_hash = await clients[userid].send_code(phone)
     except BaseException as err:
-        await update.effective_user.send_message(err.args[0]) 
+        await update.effective_user.send_message(err.args[0], reply_markup=reply_markup) 
         return ConversationHandler.END
 
     user_data["phone_code_hash"] = phone_code_hash
     text = "Введите код авторизации, предварительно добавьте после второй цифры тире. Пример: 31-471:"
-    await update.effective_message.reply_text(text=text)
+    await update.effective_message.reply_text(text=text, reply_markup=reply_markup)
     return ENTER_CODE
 
 async def try_sign(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -359,14 +375,14 @@ async def try_sign(update: Update, context: ContextTypes.DEFAULT_TYPE):
     code = update.message.text
     code = code.replace("-", "")
     phone_code_hash = user_data["phone_code_hash"]
-
+    reply_markup = InlineKeyboardMarkup(cancel_btn)
     try:
         await clients[userid].sign(phone, code, phone_code_hash=phone_code_hash)
         return await tglogin_finish(update, context)
     except telethon_errors.SessionPasswordNeededError:
         text = ("Введите пароль от телеграм-аккаунта:\n"
                 "(Осторожно, пароль передается открытым незашифрованным способом!)")
-        await update.effective_user.send_message(text)
+        await update.effective_user.send_message(text, reply_markup=reply_markup)
         return ENTER_PASSWORD
     except BaseException as err:
         await update.effective_user.send_message(err.args[0])
@@ -376,6 +392,7 @@ async def enter_password(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     userid = update.effective_user.id
     user_data = context.user_data
     password = update.message.text
+    reply_markup = InlineKeyboardMarkup(menu_btn)
     if not await clients[userid].is_connected():
         await update.message.reply_text(text="Сессия авторизации прервана. Попробуйте снова.")
         return ConversationHandler.END
@@ -384,7 +401,7 @@ async def enter_password(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await clients[userid].save_phone()
         clients[userid].disconnect()
     except BaseException as err:
-        await update.effective_user.send_message(err.args[0])
+        await update.effective_user.send_message(err.args[0], reply_markup=reply_markup)
         return ConversationHandler.END
     return await tglogin_finish(update, context)
 
@@ -392,7 +409,8 @@ async def tglogin_finish(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     userid = update.effective_user.id
     user_data = context.user_data
     text = "Авторизация успешно завершена."
-    await update.message.reply_text(text=text)
+    reply_markup = InlineKeyboardMarkup(menu_btn)
+    await update.message.reply_text(text=text, reply_markup=reply_markup)
     return ConversationHandler.END
 
 # async def mytask(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -476,8 +494,8 @@ def main() -> None:
             ENTER_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, enter_days)],
             ENTER_DAYS: [MessageHandler(filters.TEXT & ~filters.COMMAND, broadcast_finish)],
         },
-        fallbacks=[CommandHandler('start', start), CommandHandler('cancel', command_cancel),],
-                    # CallbackQueryHandler(query_cancel, pattern=f"^{CANCEL}$")],
+        fallbacks=[CommandHandler('start', start), CallbackQueryHandler(start, pattern=f"^{CANCEL}$"),
+                                    CallbackQueryHandler(start, pattern=f"^{MENU}$")],
         map_to_parent={}
     )
     conv_active_broadcast = ConversationHandler(
@@ -487,15 +505,16 @@ def main() -> None:
                                CallbackQueryHandler(active_broadcast, pattern=f"^{LEFT}$"),
                                CallbackQueryHandler(choose_broadcast, pattern=f"^(job-)")],
         },
-        fallbacks=[CommandHandler('start', start), CommandHandler('cancel', command_cancel),
-                    CallbackQueryHandler(button_cancel, pattern=f"^{CANCEL}$")],
+        fallbacks=[CommandHandler('start', start), CallbackQueryHandler(start, pattern=f"^{CANCEL}$"),
+                                    CallbackQueryHandler(start, pattern=f"^{MENU}$")],
     )
     conv_add_admin = ConversationHandler(
         entry_points=[CallbackQueryHandler(add_admin, pattern=f"^{ADD_ADMIN}$")],
         states={
             ADD_ADMIN: [MessageHandler(filters.TEXT & ~filters.COMMAND ,add_admin_complete)],
         },
-        fallbacks=[CommandHandler('start', start), CommandHandler('cancel', command_cancel)],
+        fallbacks=[CommandHandler('start', start), CallbackQueryHandler(start, pattern=f"^{CANCEL}$"),
+                                    CallbackQueryHandler(start, pattern=f"^{MENU}$")],
     )
     conv_tglogin = ConversationHandler(
         entry_points=[CallbackQueryHandler(tglogin, pattern=f"^{TGLOGIN}$")],
@@ -504,7 +523,8 @@ def main() -> None:
             ENTER_CODE: [MessageHandler(filters.TEXT & ~filters.COMMAND, try_sign)],
             ENTER_PASSWORD: [MessageHandler(filters.TEXT & ~filters.COMMAND, enter_password)]
         },
-        fallbacks=[CommandHandler('start', start), CommandHandler('cancel', command_cancel)],
+        fallbacks=[CommandHandler('start', start), CallbackQueryHandler(start, pattern=f"^{CANCEL}$"),
+                                    CallbackQueryHandler(start, pattern=f"^{MENU}$")],
         # map_to_parent={}
     )
     # app.add_error_handler(error_handler)
