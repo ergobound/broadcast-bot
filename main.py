@@ -241,7 +241,7 @@ async def broadtask(context: ContextTypes.DEFAULT_TYPE) -> None:
         text = "Сообщение доставлено:\n" + (BROADCAST_INFO % job.data)
         logging.info(f"broadtask | Сообщение доставлено {job.data}")
     except BaseException as err:
-        text = f"Сообщение не доставлено для {job.data["contact"]}:\n{err.args[0]}"
+        text = f"Сообщение не доставлено для {job.data['contact']}:\n{err.args[0]}"
     
     # Логирование в избранное аккаунта, который отвечает за рассылку
     # try: await clients[userid].send_message("me", text)
