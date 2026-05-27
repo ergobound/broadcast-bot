@@ -309,9 +309,9 @@ async def delete_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     else:
         job.schedule_removal()
         text = "Рассылка удалена"
-    reply_markup = InlineKeyboardMarkup(menu_btn)
+    # reply_markup = InlineKeyboardMarkup(menu_btn)
     await query.answer()
-    await query.edit_message_text(text, reply_markup=reply_markup)
+    await query.edit_message_text(text, reply_markup=None)
 #ADMIN
 async def add_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
@@ -417,7 +417,7 @@ async def tglogin_finish(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     text = "Авторизация успешно завершена."
     reply_markup = InlineKeyboardMarkup(menu_btn)
     await update.message.reply_text(text=text, reply_markup=reply_markup)
-    return ConversationHandler.END
+    # return ConversationHandler.END
 
 # async def mytask(context: ContextTypes.DEFAULT_TYPE) -> None:
 #     job = context.job
